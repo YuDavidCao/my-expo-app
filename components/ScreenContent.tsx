@@ -14,6 +14,9 @@ import {
   TouchableWithoutFeedback,
   Platform,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Reanimated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 
 type ScreenContentProps = {
   title: string;
@@ -32,7 +35,14 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MODAL_HEIGHT = SCREEN_HEIGHT * 0.8;
 
 export const ScreenContent = ({ title, path, children }: ScreenContentProps) => {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([
+    {
+      id: 1,
+      title: 'Task 1',
+      description: 'Description 1',
+      completed: false,
+    },
+  ]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -102,55 +112,107 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
     }
   }, [isModalVisible]);
 
+  function LeftAction(prog: SharedValue<number>, drag: SharedValue<number>, taskId: number) {
+    const styleAnimation = useAnimatedStyle(() => {
+      return {
+        transform: [{ translateX: drag.value - 110 }],
+      };
+    });
+
+    const task = tasks.find((t) => t.id === taskId);
+
+    return (
+      <Reanimated.View style={styleAnimation} className="mb-4 w-[110px]">
+        <TouchableOpacity
+          className={`flex h-full w-[100px] items-center justify-center rounded-lg ${
+            !task?.completed ? 'bg-gray-300' : 'bg-green-500'
+          }`}
+          onPress={() => toggleTask(taskId)}>
+          {task?.completed ? <Check size={24} color="white" /> : <X size={24} color="white" />}
+        </TouchableOpacity>
+      </Reanimated.View>
+    );
+  }
+
+  function RightAction(prog: SharedValue<number>, drag: SharedValue<number>) {
+    const styleAnimation = useAnimatedStyle(() => {
+      return {
+        transform: [{ translateX: drag.value + 110 }],
+      };
+    });
+
+    return (
+      <Reanimated.View style={styleAnimation} className="mb-4 w-[110px]">
+        <View className="flex h-full w-[100px] items-center justify-center rounded-lg bg-red-500">
+          <Trash2 size={24} color="white" />
+        </View>
+      </Reanimated.View>
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView className="h-full flex-1 items-center justify-start bg-white p-4">
         <Text className="mb-6 text-center text-2xl font-bold">Task List</Text>
-        <ScrollView className="w-full flex-1">
-          {tasks.length === 0 ? (
-            <View className="flex-1 items-center justify-center py-20">
-              <Text className="text-gray-400">No tasks yet. Add one to get started!</Text>
-            </View>
-          ) : (
-            tasks.map((task) => (
-              <View
-                key={task.id}
-                className="mb-4 overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <TouchableOpacity
-                  className="flex-row items-start space-x-3"
-                  onPress={() => toggleTask(task.id)}>
-                  <View
-                    className={`mr-2 mt-1 h-6 w-6 items-center justify-center self-center rounded-full border-2 ${
-                      task.completed ? 'border-ten bg-ten' : 'border-gray-300'
-                    }`}>
-                    {task.completed && <Check size={16} color="white" />}
-                  </View>
-                  <View className="flex-1">
-                    <Text
-                      className={`text-lg font-medium ${
-                        task.completed ? 'text-gray-400 line-through' : 'text-gray-800'
-                      }`}>
-                      {task.title}
-                    </Text>
-                    {task.description ? (
-                      <Text
-                        className={`mt-1 ${
-                          task.completed ? 'text-gray-400 line-through' : 'text-gray-600'
-                        }`}>
-                        {task.description}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <TouchableOpacity
-                    className="ml-2 flex self-center"
-                    onPress={() => deleteTask(task.id)}>
-                    <Trash2 size={20} color="#EF4444" />
-                  </TouchableOpacity>
-                </TouchableOpacity>
+        <GestureHandlerRootView className="w-full flex-1">
+          <ScrollView className="w-full flex-1">
+            {tasks.length === 0 ? (
+              <View className="flex-1 items-center justify-center py-20">
+                <Text className="text-gray-400">No tasks yet. Add one to get started!</Text>
               </View>
-            ))
-          )}
-        </ScrollView>
+            ) : (
+              tasks.map((task) => (
+                <ReanimatedSwipeable
+                  key={task.id}
+                  friction={2}
+                  enableTrackpadTwoFingerGesture
+                  rightThreshold={40}
+                  leftThreshold={40}
+                  renderRightActions={(prog, drag) => RightAction(prog, drag)}
+                  renderLeftActions={(prog, drag) => LeftAction(prog, drag, task.id)}
+                  onSwipeableOpen={(direction) => {
+                    if (direction === 'left') {
+                      deleteTask(task.id);
+                    } else if (direction === 'right') {
+                      toggleTask(task.id);
+                    }
+                  }}>
+                  <View className="mb-4 overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                    <TouchableOpacity
+                      className="flex-row items-start space-x-3"
+                      onPress={() => toggleTask(task.id)}>
+                      <View
+                        className={`mr-2 mt-1 h-6 w-6 items-center justify-center self-center rounded-full border-2 ${
+                          task.completed ? 'border-ten bg-ten' : 'border-gray-300'
+                        }`}>
+                        {task.completed && <Check size={16} color="white" />}
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          className={`text-lg font-medium ${
+                            task.completed ? 'text-gray-400 line-through' : 'text-gray-800'
+                          }`}>
+                          {task.title}
+                        </Text>
+                        {task.description ? (
+                          <Text
+                            className={`mt-1 ${
+                              task.completed ? 'text-gray-400 line-through' : 'text-gray-600'
+                            }`}>
+                            {task.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <TouchableOpacity className="self-center" onPress={() => deleteTask(task.id)}>
+                        <Trash2 size={24} color="red" />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  </View>
+                </ReanimatedSwipeable>
+              ))
+            )}
+          </ScrollView>
+        </GestureHandlerRootView>
 
         <TouchableOpacity
           className="bg-ten absolute bottom-4 right-10 rounded-full p-5"
