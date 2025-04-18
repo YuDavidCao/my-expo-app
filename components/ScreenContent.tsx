@@ -17,6 +17,8 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Reanimated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import Toast from 'react-native-toast-message';
+import uuid from 'react-native-uuid';
 
 type ScreenContentProps = {
   title: string;
@@ -25,7 +27,7 @@ type ScreenContentProps = {
 };
 
 type Task = {
-  id: number;
+  id: string;
   title: string;
   description: string;
   completed: boolean;
@@ -36,12 +38,24 @@ const MODAL_HEIGHT = SCREEN_HEIGHT * 0.8;
 
 export const ScreenContent = ({ title, path, children }: ScreenContentProps) => {
   const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: 1,
-      title: 'Task 1',
-      description: 'Description 1',
-      completed: false,
-    },
+    // {
+    //   id: uuid.v4(),
+    //   title: 'Task 1',
+    //   description: 'Description 1',
+    //   completed: false,
+    // },
+    // {
+    //   id: uuid.v4(),
+    //   title: 'Task 2',
+    //   description: 'Description 2',
+    //   completed: false,
+    // },
+    // {
+    //   id: uuid.v4(),
+    //   title: 'Task 3',
+    //   description: 'Description 3',
+    //   completed: false,
+    // },
   ]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
@@ -49,6 +63,7 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
 
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const swipeableRefs = useRef(new Map()).current; //url: https://github.com/software-mansion/react-native-gesture-handler/issues/764#issuecomment-635552081
 
   const showModal = () => {
     setIsModalVisible(true);
@@ -75,7 +90,7 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
     setTasks([
       ...tasks,
       {
-        id: tasks.length + 1,
+        id: uuid.v4(),
         title: newTaskTitle,
         description: newTaskDescription,
         completed: false,
@@ -85,14 +100,40 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
     setNewTaskDescription('');
   };
 
-  const toggleTask = (id: number) => {
+  const toggleTask = (id: string) => {
     setTasks(
       tasks.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task))
     );
   };
 
-  const deleteTask = (id: number) => {
-    setTasks(tasks.filter((task) => task.id !== id));
+  const deleteTask = (id: string) => {
+    console.log('deleteTask', id);
+    const taskToDelete = tasks.find((task) => task.id === id);
+    if (taskToDelete) {
+      setTasks(tasks.filter((task) => task.id !== id));
+      Toast.show({
+        type: 'info',
+        position: 'bottom',
+        text1: 'Task deleted',
+        text2: 'Tap to undo',
+        onPress: () => {
+          setTasks((prevTasks) => [...prevTasks, taskToDelete]);
+          Toast.hide();
+        },
+        visibilityTime: 3000,
+        autoHide: true,
+        topOffset: 0,
+        bottomOffset: 40,
+      });
+    }
+  };
+
+  const closeAllOtherSwipeables = (taskId: string) => {
+    [...swipeableRefs.entries()].forEach(([key, ref]) => {
+      if (key !== taskId && ref) {
+        ref.close();
+      }
+    });
   };
 
   useEffect(() => {
@@ -112,7 +153,7 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
     }
   }, [isModalVisible]);
 
-  function LeftAction(prog: SharedValue<number>, drag: SharedValue<number>, taskId: number) {
+  function LeftAction(prog: SharedValue<number>, drag: SharedValue<number>, taskId: string) {
     const styleAnimation = useAnimatedStyle(() => {
       return {
         transform: [{ translateX: drag.value - 110 }],
@@ -122,7 +163,7 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
     const task = tasks.find((t) => t.id === taskId);
 
     return (
-      <Reanimated.View style={styleAnimation} className="mb-4 w-[110px]">
+      <Reanimated.View style={styleAnimation} className="mb-4 w-[110px]" key={taskId}>
         <TouchableOpacity
           className={`flex h-full w-[100px] items-center justify-center rounded-lg ${
             !task?.completed ? 'bg-gray-300' : 'bg-green-500'
@@ -134,7 +175,7 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
     );
   }
 
-  function RightAction(prog: SharedValue<number>, drag: SharedValue<number>) {
+  function RightAction(prog: SharedValue<number>, drag: SharedValue<number>, taskId: string) {
     const styleAnimation = useAnimatedStyle(() => {
       return {
         transform: [{ translateX: drag.value + 110 }],
@@ -142,7 +183,7 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
     });
 
     return (
-      <Reanimated.View style={styleAnimation} className="mb-4 w-[110px]">
+      <Reanimated.View style={styleAnimation} className="mb-4 w-[110px]" key={taskId}>
         <View className="flex h-full w-[100px] items-center justify-center rounded-lg bg-red-500">
           <Trash2 size={24} color="white" />
         </View>
@@ -162,14 +203,22 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
               </View>
             ) : (
               tasks.map((task) => (
-                <ReanimatedSwipeable
+                <ReanimatedSwipeable //url: https://docs.swmansion.com/react-native-gesture-handler/docs/components/reanimated_swipeable
                   key={task.id}
+                  ref={(ref) => {
+                    if (ref && !swipeableRefs.has(task.id)) {
+                      swipeableRefs.set(task.id, ref);
+                    }
+                  }}
                   friction={2}
                   enableTrackpadTwoFingerGesture
                   rightThreshold={40}
                   leftThreshold={40}
-                  renderRightActions={(prog, drag) => RightAction(prog, drag)}
+                  renderRightActions={(prog, drag) => RightAction(prog, drag, task.id)}
                   renderLeftActions={(prog, drag) => LeftAction(prog, drag, task.id)}
+                  onSwipeableWillOpen={() => {
+                    closeAllOtherSwipeables(task.id);
+                  }}
                   onSwipeableOpen={(direction) => {
                     if (direction === 'left') {
                       deleteTask(task.id);
@@ -272,6 +321,7 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
           </TouchableWithoutFeedback>
         </Modal>
       </KeyboardAvoidingView>
+      <Toast />
     </SafeAreaView>
   );
 };
