@@ -166,10 +166,10 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
       <Reanimated.View style={styleAnimation} className="mb-4 w-[110px]" key={taskId}>
         <TouchableOpacity
           className={`flex h-full w-[100px] items-center justify-center rounded-lg ${
-            !task?.completed ? 'bg-gray-300' : 'bg-green-500'
+            task?.completed ? 'bg-gray-300' : 'bg-green-500'
           }`}
           onPress={() => toggleTask(taskId)}>
-          {task?.completed ? <Check size={24} color="white" /> : <X size={24} color="white" />}
+          {!task?.completed ? <Check size={24} color="white" /> : <X size={24} color="white" />}
         </TouchableOpacity>
       </Reanimated.View>
     );
@@ -184,9 +184,11 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
 
     return (
       <Reanimated.View style={styleAnimation} className="mb-4 w-[110px]" key={taskId}>
-        <View className="flex h-full w-[100px] items-center justify-center rounded-lg bg-red-500">
+        <TouchableOpacity
+          className="flex h-full w-[100px] items-center justify-center rounded-lg bg-red-500"
+          onPress={() => deleteTask(taskId)}>
           <Trash2 size={24} color="white" />
-        </View>
+        </TouchableOpacity>
       </Reanimated.View>
     );
   }
@@ -263,13 +265,17 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
           </ScrollView>
         </GestureHandlerRootView>
 
-        <TouchableOpacity
+        <TouchableOpacity //floating action button
           className="bg-ten absolute bottom-4 right-10 rounded-full p-5"
           onPress={showModal}>
           <Plus size={24} color="white" />
         </TouchableOpacity>
 
-        <Modal visible={isModalVisible} transparent onRequestClose={hideModal} animationType="none">
+        <Modal //modal for adding a new task
+          visible={isModalVisible}
+          transparent
+          onRequestClose={hideModal}
+          animationType="none">
           <TouchableWithoutFeedback onPress={hideModal}>
             <Animated.View className="flex-1 bg-black/50" style={{ opacity: fadeAnim }}>
               <TouchableWithoutFeedback>
